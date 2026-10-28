@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+care-coordinator.db
+*.db
+__pycache__/
+.pytest_cache/
+.venv/
+venv/

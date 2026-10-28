@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Care Coordination</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", sans-serif;
+        color: #172b3a;
+        background: #f3f7f8;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; }
+      header {
+        padding: 1.25rem max(1.5rem, calc((100% - 1120px) / 2));
+        color: #fff;
+        background: #124a55;
+      }
+      header h1 { margin: 0; font-size: 1.4rem; }
+      header p { margin: .4rem 0 0; color: #d3e8e8; }
+      main { max-width: 1120px; margin: 2rem auto; padding: 0 1.25rem; }
+      .notice {
+        border-left: 4px solid #d99032;
+        background: #fff6e8;
+        padding: .8rem 1rem;
+        margin-bottom: 1.25rem;
+      }
+      .toolbar, .case-card, .metric, .reminder-card {
+        border: 1px solid #d9e3e5;
+        border-radius: 10px;
+        background: white;
+        padding: 1rem;
+      }
+      .toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) auto auto; gap: .75rem; align-items: end; }
+      label { display: block; font-size: .9rem; font-weight: 600; }
+      input, select {
+        display: block;
+        width: 100%;
+        margin-top: .35rem;
+        padding: .6rem;
+        border: 1px solid #aebfc2;
+        border-radius: 6px;
+        font: inherit;
+      }
+      button {
+        border: 0;
+        border-radius: 6px;
+        padding: .65rem .85rem;
+        color: #fff;
+        background: #126579;
+        cursor: pointer;
+        font: inherit;
+      }
+      button.secondary { color: #17434c; background: #e4eff0; }
+      button.danger { background: #974d37; }
+      button:disabled { background: #9aaeb2; cursor: not-allowed; }
+      h2 { margin: 1.5rem 0 .75rem; }
+      .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: .75rem; margin-top: 1rem; }
+      .metric strong { display: block; font-size: 1.6rem; color: #124a55; }
+      .metric span { color: #51666b; font-size: .9rem; }
+      .progress-list { display: grid; gap: .55rem; max-width: 760px; }
+      .progress-row { display: grid; grid-template-columns: minmax(150px, 1fr) 3fr 2rem; gap: .75rem; align-items: center; }
+      .workload-wrap { overflow-x: auto; border: 1px solid #d9e3e5; border-radius: 10px; background: white; }
+      .workload { width: 100%; border-collapse: collapse; text-align: left; }
+      .workload th, .workload td { padding: .75rem 1rem; border-bottom: 1px solid #e1e9ea; }
+      .workload th { color: #345b63; font-size: .9rem; }
+      .workload tbody tr:last-child td { border-bottom: 0; }
+      progress { width: 100%; height: 1rem; accent-color: #126579; }
+      .filters { display: grid; grid-template-columns: repeat(6, minmax(130px, 1fr)); gap: .7rem; border: 1px solid #d9e3e5; border-radius: 10px; padding: 1rem; background: white; }
+      .filters .search { grid-column: span 2; }
+      .filter-actions { display: flex; gap: .5rem; align-items: end; }
+      .section-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .6rem; }
+      #cases, #reminders { display: grid; gap: .75rem; }
+      .case-card { display: grid; grid-template-columns: 1fr; gap: .9rem; }
+      .case-head { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: center; }
+      .case-id { font-family: Consolas, monospace; overflow-wrap: anywhere; }
+      .step { color: #345b63; }
+      .case-controls { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(200px, 1fr) auto; gap: .65rem; align-items: end; }
+      .approval { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; padding-top: .8rem; border-top: 1px solid #e1e9ea; }
+      .audit { border-top: 1px solid #e1e9ea; padding-top: .75rem; }
+      .audit h3 { margin: 0 0 .6rem; font-size: 1rem; }
+      .audit ol { margin: 0; padding-left: 1.25rem; }
+      .audit li { margin: .45rem 0; }
+      .approval label { flex: 1 1 190px; }
+      .status { display: inline-block; border-radius: 20px; padding: .25rem .6rem; background: #e7eff0; font-size: .85rem; }
+      .status.overdue { color: #782f20; background: #fae7e1; }
+      .status.due_today { color: #714a0b; background: #fff0cc; }
+      .reminder-card { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; }
+      .reminder-card .case-id { flex: 1 1 250px; }
+      .reminder-card button { padding: .45rem .65rem; }
+      .case-meta { display: flex; flex-wrap: wrap; gap: .4rem 1rem; color: #51666b; font-size: .9rem; }
+      .pagination { display: flex; align-items: center; justify-content: center; gap: .75rem; margin-top: .9rem; }
+      #message { min-height: 1.4rem; margin: 1rem 0; }
+      .muted, .empty { color: #617378; }
+      @media (max-width: 900px) { .filters { grid-template-columns: repeat(3, minmax(130px, 1fr)); } }
+      @media (max-width: 760px) {
+        .toolbar, .case-controls { grid-template-columns: 1fr; }
+        .filters { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+        .filters .search { grid-column: span 2; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Care Coordination</h1>
+      <p>Human-supervised workflow prototype</p>
+    </header>
+    <main>
+      <div class="notice">
+        Demo only: do not enter patient names, medical record numbers, or health details.
+        No patient messages are sent. This app does not diagnose, triage, prescribe, or give clinical advice.
+      </div>
+      <section class="toolbar" aria-label="Coordinator controls">
+        <label for="api-key">Local demo API key
+          <input id="api-key" type="password" autocomplete="off" placeholder="Enter CARE_API_KEY">
+        </label>
+        <button id="refresh" type="button" class="secondary">Refresh dashboard</button>
+        <button id="create" type="button">Create care case</button>
+      </section>
+      <p id="message" role="status" aria-live="polite"></p>
+      <section class="metrics" aria-label="Workflow summary">
+        <div class="metric"><strong id="total-count">0</strong><span>Total cases</span></div>
+        <div class="metric"><strong id="active-count">0</strong><span>Active</span></div>
+        <div class="metric"><strong id="completed-count">0</strong><span>Completed</span></div>
+        <div class="metric"><strong id="overdue-count">0</strong><span>Overdue</span></div>
+        <div class="metric"><strong id="due-count">0</strong><span>Due today</span></div>
+        <div class="metric"><strong id="due-soon-count">0</strong><span>Due in 7 days</span></div>
+        <div class="metric"><strong id="approval-count">0</strong><span>Pending approval</span></div>
+        <div class="metric"><strong id="unassigned-count">0</strong><span>Unassigned</span></div>
+      </section>
+      <h2>Workflow progress</h2>
+      <section id="step-breakdown" class="progress-list" aria-label="Cases by workflow step"></section>
+      <div class="section-heading">
+        <h2>Due worklist <span class="muted">(internal reminders only)</span></h2>
+        <span id="last-refreshed" class="muted"></span>
+      </div>
+      <div id="reminders"></div>
+      <h2>Team workload <span class="muted">(active cases only)</span></h2>
+      <div id="team-workload"></div>
+      <div class="section-heading">
+        <h2>Care cases</h2>
+        <button id="export" type="button" class="secondary">Export filtered CSV</button>
+      </div>
+      <section class="filters" aria-label="Filter care cases">
+        <label class="search" for="case-search">Search case or staff ID
+          <input id="case-search" type="search" placeholder="Search pseudonymous records">
+        </label>
+        <label for="step-filter">Workflow step
+          <select id="step-filter">
+            <option value="">All steps</option>
+            <option value="referral_received">Referral received</option>
+            <option value="patient_contacted">Patient contacted</option>
+            <option value="appointment_scheduled">Appointment scheduled</option>
+            <option value="follow_up_completed">Follow-up completed</option>
+          </select>
+        </label>
+        <label for="assignee-filter">Assigned staff
+          <select id="assignee-filter"><option value="">All staff</option></select>
+        </label>
+        <label for="due-filter">Due status
+          <select id="due-filter">
+            <option value="">Any due status</option>
+            <option value="overdue">Overdue</option>
+            <option value="due_today">Due today</option>
+            <option value="upcoming">Due in 7 days</option>
+            <option value="unscheduled">No due date</option>
+          </select>
+        </label>
+        <label for="approval-filter">Approval
+          <select id="approval-filter">
+            <option value="">Any approval</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="not_required">Not required</option>
+          </select>
+        </label>
+        <label for="sort-order">Sort by
+          <select id="sort-order">
+            <option value="updated_desc">Recently updated</option>
+            <option value="due_asc">Soonest due</option>
+            <option value="created_desc">Newest case</option>
+          </select>
+        </label>
+        <button id="clear-filters" type="button" class="secondary">Clear filters</button>
+      </section>
+      <p id="filter-summary" class="muted" aria-live="polite"></p>
+      <div id="cases"></div>
+      <nav class="pagination" aria-label="Case pages">
+        <button id="previous-page" type="button" class="secondary">Previous</button>
+        <span id="page-label" class="muted"></span>
+        <button id="next-page" type="button" class="secondary">Next</button>
+      </nav>
+    </main>
+    <script>
+      const apiKeyInput = document.querySelector("#api-key");
+      const casesElement = document.querySelector("#cases");
+      const remindersElement = document.querySelector("#reminders");
+      const workloadElement = document.querySelector("#team-workload");
+      const messageElement = document.querySelector("#message");
+      const filterIds = ["case-search", "step-filter", "assignee-filter", "due-filter", "approval-filter", "sort-order"];
+      const pageSize = 25;
+      let allCases = [];
+      let filteredCases = [];
+      let currentPage = 0;
+      const steps = {
+        referral_received: ["patient_contacted", "Mark patient contacted"],
+        patient_contacted: ["appointment_scheduled", "Mark appointment scheduled"],
+        appointment_scheduled: ["follow_up_completed", "Mark follow-up completed"],
+      };
+
+      function requestHeaders(extra = {}) {
+        return { Authorization: `Bearer ${apiKeyInput.value}`, ...extra };
+      }
+
+      async function api(path, options = {}, token = apiKeyInput.value) {
+        const response = await fetch(path, {
+          ...options,
+          headers: {
+            ...requestHeaders(options.headers || {}),
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const body = await response.json();
+        if (!response.ok) {
+          const detail = Array.isArray(body.detail)
+            ? body.detail.map(item => item.msg).join("; ")
+            : body.detail;
+          throw new Error(detail || "Request failed");
+        }
+        return body;
+      }
+
+      function showMessage(message) {
+        messageElement.textContent = message;
+      }
+
+      function makeElement(tag, className, text) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        if (text) element.textContent = text;
+        return element;
+      }
+
+      function localDateTimeValue(isoValue) {
+        if (!isoValue) return "";
+        const date = new Date(isoValue);
+        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+        return date.toISOString().slice(0, 16);
+      }
+
+      function dueStatus(careCase) {
+        if (!careCase.due_at) return "unscheduled";
+        const dueDate = new Date(careCase.due_at);
+        const now = new Date();
+        const todayUtc = now.toISOString().slice(0, 10);
+        const dueUtc = dueDate.toISOString().slice(0, 10);
+        if (dueUtc < todayUtc) return "overdue";
+        if (dueUtc === todayUtc) return "due_today";
+        if (dueDate.getTime() <= now.getTime() + 7 * 24 * 60 * 60 * 1000) return "upcoming";
+        return "later";
+      }
+
+      function populateAssigneeFilter() {
+        const select = document.querySelector("#assignee-filter");
+        const selected = select.value;
+        select.replaceChildren(new Option("All staff", ""));
+        const assignees = [...new Set(allCases.map(item => item.assigned_to).filter(Boolean))].sort();
+        for (const assignee of assignees) select.add(new Option(assignee, assignee));
+        if (assignees.includes(selected)) select.value = selected;
+      }
+
+      function getFilteredCases() {
+        const query = document.querySelector("#case-search").value.trim().toLowerCase();
+        const step = document.querySelector("#step-filter").value;
+        const assignee = document.querySelector("#assignee-filter").value;
+        const due = document.querySelector("#due-filter").value;
+        const approval = document.querySelector("#approval-filter").value;
+        const sort = document.querySelector("#sort-order").value;
+        const result = allCases.filter(careCase => {
+          const matchesQuery = !query ||
+            `${careCase.case_id} ${careCase.assigned_to || ""} ${careCase.current_step}`.toLowerCase().includes(query);
+          return matchesQuery &&
+            (!step || careCase.current_step === step) &&
+            (!assignee || careCase.assigned_to === assignee) &&
+            (!due || dueStatus(careCase) === due) &&
+            (!approval || careCase.approval_status === approval);
+        });
+        result.sort((left, right) => {
+          if (sort === "due_asc") {
+            return (left.due_at ? Date.parse(left.due_at) : Number.MAX_SAFE_INTEGER) -
+              (right.due_at ? Date.parse(right.due_at) : Number.MAX_SAFE_INTEGER);
+          }
+          const field = sort === "created_desc" ? "created_at" : "updated_at";
+          return Date.parse(right[field]) - Date.parse(left[field]);
+        });
+        return result;
+      }
+
+      function applyFilters() {
+        filteredCases = getFilteredCases();
+        const pageCount = Math.max(1, Math.ceil(filteredCases.length / pageSize));
+        currentPage = Math.min(currentPage, pageCount - 1);
+        const start = currentPage * pageSize;
+        const pageCases = filteredCases.slice(start, start + pageSize);
+        casesElement.replaceChildren();
+        if (!filteredCases.length) {
+          const emptyMessage = allCases.length
+            ? "No cases match these filters."
+            : "No cases yet. Create a pseudonymous demo case to begin.";
+          casesElement.append(makeElement("p", "empty", emptyMessage));
+        } else {
+          for (const careCase of pageCases) casesElement.append(renderCase(careCase));
+        }
+        document.querySelector("#filter-summary").textContent =
+          `Showing ${start + (pageCases.length ? 1 : 0)}–${start + pageCases.length} of ${filteredCases.length} matching cases`;
+        document.querySelector("#page-label").textContent = `Page ${currentPage + 1} of ${pageCount}`;
+        document.querySelector("#previous-page").disabled = currentPage === 0;
+        document.querySelector("#next-page").disabled = currentPage >= pageCount - 1;
+      }
+
+      function exportCases() {
+        const columns = ["case_id", "current_step", "assigned_to", "due_at", "approval_status", "created_at", "updated_at"];
+        const escapeCsv = value => `"${String(value ?? "").replaceAll('"', '""')}"`;
+        const rows = [columns, ...filteredCases.map(careCase => columns.map(column => careCase[column] || ""))];
+        const csv = rows.map(row => row.map(escapeCsv).join(",")).join("\r\n");
+        const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `care-cases-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      async function recordStep(careCase, event, button) {
+        button.disabled = true;
+        try {
+          await api(`/cases/${careCase.case_id}/events`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": crypto.randomUUID(),
+            },
+            body: JSON.stringify({ case_id: careCase.case_id, event }),
+          });
+          showMessage("Checkpoint recorded.");
+          await refreshDashboard();
+        } catch (error) {
+          button.disabled = false;
+          showMessage(error.message);
+        }
+      }
+
+      async function loadAuditHistory(caseId, button, container) {
+        button.disabled = true;
+        try {
+          const careCase = await api(`/cases/${caseId}`);
+          const list = makeElement("ol");
+          for (const entry of careCase.audit_log) {
+            const details = entry.details ? ` · ${entry.details}` : "";
+            const transition = entry.old_step === entry.new_step
+              ? entry.new_step
+              : `${entry.old_step} -> ${entry.new_step}`;
+            const line = makeElement(
+              "li",
+              "",
+              `${new Date(entry.created_at).toLocaleString()} · ${entry.event.replaceAll("_", " ")} · ${entry.actor} · ${transition}${details}`,
+            );
+            list.append(line);
+          }
+          container.replaceChildren(makeElement("h3", "", "Recorded history"), list);
+          button.textContent = "Refresh history";
+        } catch (error) {
+          showMessage(error.message);
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      function renderCase(careCase) {
+        const card = makeElement("section", "case-card");
+        card.dataset.caseId = careCase.case_id;
+        const head = makeElement("div", "case-head");
+        head.append(
+          makeElement("span", "case-id", careCase.case_id),
+          makeElement("span", "step", `Checkpoint: ${careCase.current_step.replaceAll("_", " ")}`),
+          makeElement("span", "status", `Approval: ${careCase.approval_status.replaceAll("_", " ")}`),
+        );
+        card.append(head);
+        const meta = makeElement("div", "case-meta");
+        meta.append(
+          makeElement("span", "", `Assigned: ${careCase.assigned_to || "Unassigned"}`),
+          makeElement("span", "", `Due: ${careCase.due_at ? new Date(careCase.due_at).toLocaleString() : "Not scheduled"}`),
+          makeElement("span", "", `Updated: ${new Date(careCase.updated_at).toLocaleString()}`),
+        );
+        card.append(meta);
+
+        const assignmentForm = makeElement("form", "case-controls");
+        const assigneeLabel = makeElement("label", "", "Assigned staff ID");
+        const assigneeInput = makeElement("input");
+        assigneeInput.value = careCase.assigned_to || "";
+        assigneeInput.placeholder = "e.g. coordinator-01";
+        assigneeInput.maxLength = 64;
+        assigneeLabel.append(assigneeInput);
+        const dueLabel = makeElement("label", "", "Internal follow-up due");
+        const dueInput = makeElement("input");
+        dueInput.type = "datetime-local";
+        dueInput.value = localDateTimeValue(careCase.due_at);
+        dueLabel.append(dueInput);
+        const saveAssignment = makeElement("button", "secondary", "Save assignment / due date");
+        saveAssignment.type = "submit";
+        assignmentForm.append(assigneeLabel, dueLabel, saveAssignment);
+        assignmentForm.addEventListener("submit", async event => {
+          event.preventDefault();
+          saveAssignment.disabled = true;
+          try {
+            const dueAt = dueInput.value ? new Date(dueInput.value).toISOString() : null;
+            await api(`/cases/${careCase.case_id}/assignment`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                assigned_to: assigneeInput.value.trim() || null,
+                due_at: dueAt,
+              }),
+            });
+            showMessage("Assignment and due date saved.");
+            await refreshDashboard();
+          } catch (error) {
+            saveAssignment.disabled = false;
+            showMessage(error.message);
+          }
+        });
+        card.append(assignmentForm);
+
+        if (careCase.current_step === "appointment_scheduled") {
+          const approvalForm = makeElement("form", "approval");
+          const reviewerLabel = makeElement("label", "", "Reviewer credential");
+          const reviewerInput = makeElement("input");
+          reviewerInput.type = "password";
+          reviewerInput.autocomplete = "off";
+          reviewerInput.placeholder = "Enter separate reviewer key";
+          reviewerInput.required = true;
+          reviewerLabel.append(reviewerInput);
+          const reasonLabel = makeElement("label", "", "Reason (required to reject)");
+          const reasonInput = makeElement("input");
+          reasonInput.maxLength = 500;
+          reasonLabel.append(reasonInput);
+          const approveButton = makeElement("button", "", "Approve checkpoint");
+          const rejectButton = makeElement("button", "danger", "Reject");
+          approveButton.type = rejectButton.type = "button";
+          const submitDecision = async decision => {
+            approveButton.disabled = rejectButton.disabled = true;
+            try {
+              await api(`/cases/${careCase.case_id}/approval`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  decision,
+                  reason: reasonInput.value.trim() || null,
+                }),
+              }, reviewerInput.value);
+              showMessage(`Checkpoint ${decision}.`);
+              reviewerInput.value = "";
+              await refreshDashboard();
+            } catch (error) {
+              approveButton.disabled = rejectButton.disabled = false;
+              showMessage(error.message);
+            }
+          };
+          approveButton.addEventListener("click", () => submitDecision("approved"));
+          rejectButton.addEventListener("click", () => submitDecision("rejected"));
+          approvalForm.append(reviewerLabel, reasonLabel, approveButton, rejectButton);
+          if (careCase.approval_status === "approved") {
+            approvalForm.prepend(makeElement("span", "muted", `Approved by ${careCase.approval?.approver_id || "reviewer"}.`));
+          } else if (careCase.approval_status === "rejected") {
+            approvalForm.prepend(makeElement("span", "muted", `Rejected: ${careCase.approval?.reason || "no reason recorded"}. Re-approval is required.`));
+          }
+          card.append(approvalForm);
+        }
+
+        if (steps[careCase.current_step]) {
+          const [event, label] = steps[careCase.current_step];
+          const nextButton = makeElement("button", "", label);
+          nextButton.type = "button";
+          if (event === "follow_up_completed" && careCase.approval_status !== "approved") {
+            nextButton.disabled = true;
+            nextButton.title = "Human approval is required before completing follow-up.";
+          }
+          nextButton.addEventListener("click", () => recordStep(careCase, event, nextButton));
+          card.append(nextButton);
+        } else {
+          card.append(makeElement("span", "status", "Workflow complete"));
+        }
+
+        const auditButton = makeElement("button", "secondary", "View audit history");
+        auditButton.type = "button";
+        const audit = makeElement("section", "audit");
+        audit.hidden = true;
+        auditButton.addEventListener("click", async () => {
+          audit.hidden = false;
+          await loadAuditHistory(careCase.case_id, auditButton, audit);
+        });
+        card.append(auditButton, audit);
+        return card;
+      }
+
+      function renderReminders(reminders) {
+        remindersElement.replaceChildren();
+        if (!reminders.length) {
+          remindersElement.append(makeElement("p", "empty", "No cases are due or coming due within the next seven days."));
+          return;
+        }
+        for (const reminder of reminders) {
+          const row = makeElement("div", "reminder-card");
+          row.append(
+            makeElement("span", "case-id", reminder.case_id),
+            makeElement("span", "", reminder.current_step.replaceAll("_", " ")),
+            makeElement("span", "", `Assigned: ${reminder.assigned_to}`),
+            makeElement("span", `status ${reminder.status}`, reminder.status.replace("_", " ")),
+            makeElement("span", "muted", new Date(reminder.due_at).toLocaleString()),
+          );
+          const jump = makeElement("button", "secondary", "Open case");
+          jump.type = "button";
+          jump.addEventListener("click", () => {
+            document.querySelector("#case-search").value = reminder.case_id;
+            currentPage = 0;
+            applyFilters();
+            document.querySelector("#cases").scrollIntoView({ behavior: "smooth" });
+          });
+          row.append(jump);
+          remindersElement.append(row);
+        }
+      }
+
+      function renderStaffWorkload(workload) {
+        workloadElement.replaceChildren();
+        if (!workload.length) {
+          workloadElement.append(makeElement("p", "empty", "No active cases to summarize."));
+          return;
+        }
+        const table = makeElement("table", "workload");
+        const head = makeElement("thead");
+        const headerRow = makeElement("tr");
+        for (const label of ["Staff", "Active cases", "Overdue", "Due today", "Pending approvals"]) {
+          headerRow.append(makeElement("th", "", label));
+        }
+        head.append(headerRow);
+        const body = makeElement("tbody");
+        for (const member of workload) {
+          const row = makeElement("tr");
+          row.append(
+            makeElement("td", "", member.assigned_to || "Unassigned"),
+            makeElement("td", "", String(member.active_cases)),
+            makeElement("td", "", String(member.overdue_count)),
+            makeElement("td", "", String(member.due_today_count)),
+            makeElement("td", "", String(member.pending_approvals)),
+          );
+          body.append(row);
+        }
+        table.append(head, body);
+        const wrapper = makeElement("div", "workload-wrap");
+        wrapper.append(table);
+        workloadElement.append(wrapper);
+      }
+
+      function renderStepBreakdown(counts, total) {
+        const container = document.querySelector("#step-breakdown");
+        container.replaceChildren();
+        const labels = {
+          referral_received: "Referral received",
+          patient_contacted: "Patient contacted",
+          appointment_scheduled: "Appointment scheduled",
+          follow_up_completed: "Follow-up completed",
+        };
+        for (const [step, label] of Object.entries(labels)) {
+          const count = counts[step] || 0;
+          const row = makeElement("div", "progress-row");
+          const progress = document.createElement("progress");
+          progress.max = Math.max(total, 1);
+          progress.value = count;
+          progress.setAttribute("aria-label", `${label}: ${count} cases`);
+          row.append(
+            makeElement("span", "", label),
+            progress,
+            makeElement("strong", "", String(count)),
+          );
+          container.append(row);
+        }
+      }
+
+      async function refreshDashboard() {
+        try {
+          const dashboard = await api("/dashboard");
+          document.querySelector("#total-count").textContent = dashboard.total_cases;
+          document.querySelector("#active-count").textContent = dashboard.active_cases;
+          document.querySelector("#completed-count").textContent = dashboard.completed_cases;
+          document.querySelector("#due-count").textContent = dashboard.due_today_count;
+          document.querySelector("#overdue-count").textContent = dashboard.overdue_count;
+          document.querySelector("#due-soon-count").textContent = dashboard.due_soon_count;
+          document.querySelector("#approval-count").textContent = dashboard.pending_approvals;
+          document.querySelector("#unassigned-count").textContent = dashboard.unassigned_cases;
+          renderStepBreakdown(dashboard.step_counts, dashboard.total_cases);
+          renderStaffWorkload(dashboard.staff_workload);
+          allCases = dashboard.cases;
+          populateAssigneeFilter();
+          renderReminders(dashboard.reminders);
+          applyFilters();
+          document.querySelector("#last-refreshed").textContent =
+            `Last refreshed ${new Date().toLocaleTimeString()}`;
+          showMessage(`${dashboard.active_cases} active · ${dashboard.completed_cases} completed`);
+        } catch (error) {
+          showMessage(error.message);
+        }
+      }
+
+      document.querySelector("#refresh").addEventListener("click", refreshDashboard);
+      for (const id of filterIds) {
+        document.querySelector(`#${id}`).addEventListener(
+          id === "case-search" ? "input" : "change",
+          () => {
+            currentPage = 0;
+            applyFilters();
+          },
+        );
+      }
+      document.querySelector("#previous-page").addEventListener("click", () => {
+        currentPage = Math.max(0, currentPage - 1);
+        applyFilters();
+      });
+      document.querySelector("#next-page").addEventListener("click", () => {
+        currentPage += 1;
+        applyFilters();
+      });
+      document.querySelector("#clear-filters").addEventListener("click", () => {
+        document.querySelector("#case-search").value = "";
+        for (const id of filterIds.slice(1, -1)) document.querySelector(`#${id}`).value = "";
+        document.querySelector("#sort-order").value = "updated_desc";
+        currentPage = 0;
+        applyFilters();
+      });
+      document.querySelector("#export").addEventListener("click", exportCases);
+      document.querySelector("#create").addEventListener("click", async () => {
+        try {
+          await api("/cases", { method: "POST" });
+          showMessage("Care case created.");
+          currentPage = 0;
+          await refreshDashboard();
+        } catch (error) {
+          showMessage(error.message);
+        }
+      });
+    </script>
+  </body>
+</html>
